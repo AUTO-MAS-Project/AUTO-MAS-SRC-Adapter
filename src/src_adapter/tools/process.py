@@ -295,9 +295,9 @@ async def _kill_src_toolkit_processes(
         from auto_mas_core.devices.process import iter_processes
 
         processes = iter_processes(["pid", "name", "exe"])
-        for process in processes:
+        for candidate in processes:
             try:
-                process_info = process.info
+                process_info = candidate.info
             except (psutil.NoSuchProcess, psutil.ZombieProcess):
                 continue
             except (psutil.AccessDenied, OSError) as e:

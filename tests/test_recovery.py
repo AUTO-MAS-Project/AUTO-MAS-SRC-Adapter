@@ -38,3 +38,43 @@ def test_native_restore_respects_other_tasks_snapshot(isolated_host, tmp_path):
         restore_native_backup(config, Path(archived).name, str(uuid4()))
     assert (config / "src.json").read_text(encoding="utf-8") == '{"value":"current"}'
     assert journal.exists()
+
+
+def test_template_account_is_used_and_saved_after_quick_config(tmp_path):
+    import json
+
+    from src_adapter.tools.config import save_src_user_config, stage_src_config_update
+
+    root = tmp_path / "install"
+    native = root / "config"
+    account = tmp_path / "independent"
+    native.mkdir(parents=True)
+    account.mkdir()
+    (root / "src.exe").write_bytes(b"src")
+    (native / "src.json").write_text('{"stage":"native"}', encoding="utf-8")
+    (native / "deploy.yaml").write_text("AutoUpdate: false\n", encoding="utf-8")
+    (account / "template.json").write_text('{"stage":"account"}', encoding="utf-8")
+    (account / "deploy.template-cn.yaml").write_text(
+        "AutoUpdate: true\n", encoding="utf-8"
+    )
+    staged = stage_src_config_update(
+        native,
+        expected_installation_id=read_src_installation_id(root),
+        overlay_path=account,
+    )
+    assert json.loads((staged / "src.json").read_text())["stage"] == "account"
+    (staged / "src.json").write_text(
+        '{"stage":"injected","completed":true}', encoding="utf-8"
+    )
+    (staged / "deploy.yaml").write_text("AutoUpdate: false\n", encoding="utf-8")
+    save_src_user_config(
+        staged,
+        account,
+        runtime_baseline={"stage": "injected"},
+        runtime_deploy_baseline={"AutoUpdate": False},
+    )
+    assert json.loads((account / "src.json").read_text()) == {
+        "stage": "account",
+        "completed": True,
+    }
+    assert "AutoUpdate: true" in (account / "deploy.yaml").read_text()

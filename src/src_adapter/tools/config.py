@@ -325,7 +325,7 @@ def save_src_user_config(
         raise RuntimeError(f"SRC 账号配置内容不完整: {staging_path}")
     if runtime_baseline is not None:
         current = _utils_io.read_file(staging_path / "src.json")
-        source = _utils_io.read_file(config_path / "src.json")
+        source = _utils_io.read_file(_config_source(config_path, "src.json"))
         _restore_unchanged_source_values(current, runtime_baseline, source)
         _utils_io.write_file(staging_path / "src.json", current)
     if runtime_deploy_baseline:
@@ -334,7 +334,7 @@ def save_src_user_config(
         from .poor_yaml import poor_yaml_read, poor_yaml_write
 
         deployed = poor_yaml_read(staging_path / "deploy.yaml")
-        source = poor_yaml_read(config_path / "deploy.yaml")
+        source = poor_yaml_read(_config_source(config_path, "deploy.yaml"))
         restore = {
             key: source[key]
             for key, injected in runtime_deploy_baseline.items()
@@ -384,27 +384,31 @@ def recover_interrupted_src_config_swap(
     logger.warning(f"已回滚中断的 SRC 配置目录交换: {src_set_path}")
 
 
-def _prepare_runtime_config_files(staging_path: Path) -> None:
-    """为全新 SRC 安装生成运行期必需的配置入口。"""
+def _config_source(directory: Path, name: str) -> Path:
+    """定位原生配置入口，已初始化的文件优先于模板。"""
+    entry = directory / name
+    if entry.is_file():
+        return entry
+    if name == "deploy.yaml":
+        return directory / "deploy.template-cn.yaml"
+    return next(
+        (
+            path
+            for path in sorted(directory.glob("*.json"))
+            if path.name != "template.json"
+        ),
+        directory / "template.json",
+    )
 
-    src_json_path = staging_path / "src.json"
-    if not src_json_path.exists():
-        template_path = next(
-            (
-                path
-                for path in staging_path.glob("*.json")
-                if path.name != "template.json"
-            ),
-            staging_path / "template.json",
-        )
-        if not template_path.is_file():
-            raise RuntimeError(f"SRC 配置缺少 JSON 入口: {staging_path}")
-        shutil.copyfile(template_path, src_json_path)
 
-    deploy_path = staging_path / "deploy.yaml"
-    deploy_template_path = staging_path / "deploy.template-cn.yaml"
-    if not deploy_path.exists() and deploy_template_path.is_file():
-        shutil.copyfile(deploy_template_path, deploy_path)
+def _prepare_runtime_config_files(staging: Path, overlay: Path | None) -> None:
+    for name in ("src.json", "deploy.yaml"):
+        target = staging / name
+        source = _config_source(overlay, name) if overlay is not None else target
+        if not source.is_file():
+            source = _config_source(staging, name)
+        if source != target:
+            shutil.copyfile(source, target)
 
 
 def stage_src_config_update(
@@ -432,7 +436,7 @@ def stage_src_config_update(
     shutil.copytree(src_set_path, staging_path)
     if overlay_path is not None:
         shutil.copytree(overlay_path, staging_path, dirs_exist_ok=True)
-    _prepare_runtime_config_files(staging_path)
+    _prepare_runtime_config_files(staging_path, overlay_path)
     if not is_src_config_available(staging_path):
         raise RuntimeError(f"SRC 待提交配置内容不完整: {staging_path}")
     validate_src_installation(src_set_path.parent, expected_installation_id)

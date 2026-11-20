@@ -37,7 +37,6 @@ from auto_mas_core.host.models_schema import WSTaskNoticeData
 from auto_mas_core.host.services import script_install
 from auto_mas_core.host.services_script_install_backup import ManagedInstallBackup
 from auto_mas_core.host.task_proxy_helpers import (
-    CONFIG_BASE_NATIVE,
     CONFIG_BASE_SHARED,
     read_config_base,
 )
@@ -115,10 +114,10 @@ class SrcExpander(UserExpander):
         )
         if not src_config_available and not temp_config_available:
             return "SRC配置文件不存在或已损坏, 请检查SRC路径设置或检查配置文件情况！"
-        # 托管级存档仅在存在非原生来源账号时需要: 原生来源直接使用 SRC 安装目录的原生配置
+        # 独立来源在对应账号内检查自己的目录。
         if (
             self.task_info.mode == TaskMode.AUTO_PROXY
-            and self._has_mas_config_user()
+            and self._has_shared_config_user()
             and not (
                 Path.cwd() / f"data/{self.script_info.script_id}/Default/ConfigFile"
             ).exists()
@@ -126,12 +125,12 @@ class SrcExpander(UserExpander):
             return "未完成 SRC 全局设置, 请先设置 SRC！"
         return None
 
-    def _has_mas_config_user(self) -> bool:
-        """检查本次参与代理并使用 MAS 配置的账号。"""
+    def _has_shared_config_user(self) -> bool:
+        """本轮是否需要下发托管共享配置。"""
         return any(
             (account := self.resolve_user(user)) is not None
             and self.can_run_user(account)
-            and read_config_base(account, CONFIG_BASE_SHARED) != CONFIG_BASE_NATIVE
+            and read_config_base(account, CONFIG_BASE_SHARED) == CONFIG_BASE_SHARED
             for user in self.script_info.users.values()
         )
 
