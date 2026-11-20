@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-mas-src-adapter"
+version = "0.1.0"
+description = "SRC specialized script adapter for AUTO-MAS"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "AUTO-MAS Team" }]
+keywords = ["auto-mas-plugin", "auto-mas-id:src_adapter"]
+dependencies = ["auto-mas-core>=5.9.0b1,<6"]
+
+[project.urls]
+Changelog = "https://github.com/AUTO-MAS-Project/AUTO-MAS-SRC-Adapter/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/AUTO-MAS-Project/AUTO-MAS-SRC-Adapter/blob/main/README.md"
+Homepage = "https://auto-mas.top"
+Repository = "https://github.com/AUTO-MAS-Project/AUTO-MAS-SRC-Adapter"
+Issues = "https://github.com/AUTO-MAS-Project/AUTO-MAS-SRC-Adapter/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+src_adapter = ["py.typed", "resources/pipeline/*.json", "resources/image/StarRailEmulator/*.png"]
+
+[tool.auto-mas]
+bundled = true
+default-enabled = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+ignore = ["F403", "F405"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src_adapter"]
+known-third-party = ["app", "auto_mas_core"]
