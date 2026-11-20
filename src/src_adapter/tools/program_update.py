@@ -265,42 +265,51 @@ async def prepare_update(
                 root, base, base, repository, branch, git, objects, python.resolve()
             )
     objects = Path(tempfile.mkdtemp(prefix="git-", dir=cache))
-    await command(git, "init", "--bare", str(objects), cwd=cache)
-    if cn_source:
-        if branch != "master":
-            raise ValueError("SRC 原生 Git-over-CDN 仅提供 master 分支，请切换代码源")
-        target = await prepare_cn_objects(root, git, objects, base)
-    else:
-        proxy = str(deploy.get("GitProxy") or "").strip()
-        # 原生 GitProxy 优先；配置中的代理只传给子进程，不进入日志或任务身份。
-        await command(
-            git,
-            "-c",
-            f"http.proxy={proxy}",
-            "-c",
-            "http.sslVerify=true",
-            "fetch",
-            "--no-tags",
-            "--",
-            repository,
-            branch,
-            cwd=objects,
+    try:
+        await command(git, "init", "--bare", str(objects), cwd=cache)
+        if cn_source:
+            if branch != "master":
+                raise ValueError(
+                    "SRC 原生 Git-over-CDN 仅提供 master 分支，请切换代码源"
+                )
+            target = await prepare_cn_objects(root, git, objects, base)
+        else:
+            proxy = str(deploy.get("GitProxy") or "").strip()
+            # 原生 GitProxy 优先；配置中的代理只传给子进程，不进入日志或任务身份。
+            await command(
+                git,
+                "-c",
+                f"http.proxy={proxy}",
+                "-c",
+                "http.sslVerify=true",
+                "fetch",
+                "--no-tags",
+                "--",
+                repository,
+                branch,
+                cwd=objects,
+            )
+            target = await command(git, "rev-parse", "FETCH_HEAD", cwd=objects)
+        if not re.fullmatch(r"[0-9a-f]{40}", target):
+            raise ValueError("SRC 下载结果不是可识别的 Git 提交")
+        # CDN 回报最新且无需增量包时，bare 缓存不包含原 HEAD 对象。
+        if not (cn_source and base == target):
+            await command(git, "merge-base", "--is-ancestor", base, target, cwd=objects)
+        if (
+            base == target
+            and not (script_install.workspace(root) / "src-install.json").exists()
+        ):
+            remove_cached_git_objects(objects)
+            return None
+        return PreparedUpdate(
+            root, base, target, repository, branch, git, objects, python.resolve()
         )
-        target = await command(git, "rev-parse", "FETCH_HEAD", cwd=objects)
-    if not re.fullmatch(r"[0-9a-f]{40}", target):
-        raise ValueError("SRC 下载结果不是可识别的 Git 提交")
-    # CDN 回报最新且无需增量包时，bare 缓存不包含原 HEAD 对象。
-    if not (cn_source and base == target):
-        await command(git, "merge-base", "--is-ancestor", base, target, cwd=objects)
-    if (
-        base == target
-        and not (script_install.workspace(root) / "src-install.json").exists()
-    ):
-        remove_cached_git_objects(objects)
-        return None
-    return PreparedUpdate(
-        root, base, target, repository, branch, git, objects, python.resolve()
-    )
+    except Exception as error:
+        if not is_process_cleanup_unconfirmed(error) and not isinstance(
+            error, script_install.InstallUnsafeError
+        ):
+            remove_cached_git_objects(objects)
+        raise
 
 
 def remove_cached_git_objects(objects: Path) -> None:
@@ -316,7 +325,7 @@ def remove_cached_git_objects(objects: Path) -> None:
     try:
         shutil.rmtree(objects, onerror=make_writable)
     except OSError as error:
-        warnings.warn(f"SRC 已安装成功，但无法清理 Git 预下载缓存 {objects}: {error}")
+        warnings.warn(f"无法清理 SRC Git 预下载缓存 {objects}: {error}")
 
 
 def assert_safe_to_launch(root: Path) -> None:

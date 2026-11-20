@@ -6,6 +6,11 @@ from .backup_api import router
 from .config import SrcConfig, SrcUserConfig
 from .manager import SrcExpander
 
+# 同一个开发版 SDK 号码同时出现在拆分前后的宿主。安装流程会在 load 成功后确认发行包。
+_builtin = Config.ScriptConfig.entry_types.get("SrcConfig")
+if _builtin is not None and _builtin.__module__.startswith("app."):
+    raise ImportError("当前 AUTO-MAS 仍内置 SRC，请先更新至已迁移 SRC 专项的宿主")
+
 
 class Plugin(ScriptAdapterPlugin):
     script_type_key = "SRC"
@@ -24,9 +29,6 @@ class Plugin(ScriptAdapterPlugin):
     )
 
     async def pre_enable(self):
-        existing = Config.ScriptConfig.entry_types.get("SrcConfig")
-        if existing is not None and existing.__module__.startswith("app."):
-            raise RuntimeError("请先升级到支持独立 SRC 插件的 AUTO-MAS 版本")
         refs = {"PlanConfig": Config.PlanConfig, "games": Config.GameConfig}
         SrcConfig.related_config = refs
         SrcUserConfig.related_config = refs

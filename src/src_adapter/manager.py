@@ -307,6 +307,15 @@ class SrcExpander(UserExpander):
                         "SRC 当前配置和待恢复快照均不可用，"
                         f"请手动检查: {self.src_set_path}, {self.temp_path}"
                     )
+                elif snapshot_state.native_edit:
+                    validate_src_installation(
+                        snapshot_root_path, snapshot_state.installation_id
+                    )
+                    if not is_src_config_available(snapshot_root_path / "config"):
+                        raise RuntimeError(
+                            f"SRC 原生编辑现场不完整，已保留任务前快照 {self.temp_path}"
+                        )
+                    self._retire_src_config_snapshot()
                 elif snapshot_root_path == self.src_root_path:
                     logger.warning(f"检测到待恢复的 SRC 配置快照: {self.temp_path}")
                     self._restore_src_config_from_temp(

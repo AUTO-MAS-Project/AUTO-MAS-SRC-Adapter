@@ -323,7 +323,7 @@ class AutoProxyTask(AutoProxyWorker):
             if_get_file = False
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
-                for log_file in self.src_log_path.parent.iterdir():
+                for log_file in self.src_log_path.parent.glob("*_src.txt"):
                     if log_file.is_file():
                         with suppress(ValueError):
                             if strptime(log_file.name, "%Y-%m-%d_src.txt", t) >= t:

@@ -38,6 +38,7 @@ class SrcConfigSnapshotState:
     installation_id: str
     config_user_id: str | None = None
     owner_version: int = 1
+    native_edit: bool = False
 
 
 def read_src_installation_id(src_root_path: Path) -> str:
@@ -123,6 +124,7 @@ def read_src_config_snapshot_state(
         installation_id=installation_id,
         config_user_id=config_user_id,
         owner_version=state.get("owner_version", 1),
+        native_edit=state.get("native_edit") is True,
     )
 
 
@@ -133,6 +135,7 @@ def write_src_config_snapshot_state(
     src_root_path: Path,
     installation_id: str | None = None,
     config_user_id: str | None = None,
+    native_edit: bool = False,
 ) -> None:
     """原子记录 SRC 配置快照的根目录和设置会话归属。"""
 
@@ -154,6 +157,7 @@ def write_src_config_snapshot_state(
             "installation_id": installation_id,
             "config_user_id": config_user_id,
             "owner_version": 2,
+            "native_edit": native_edit,
         },
         format=".json",
     )

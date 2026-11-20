@@ -122,24 +122,24 @@ class SrcGuiSession:
             self.src_root_path,
             self.src_installation_id,
         )
-        self.process_cleanup_success = False
-        await self.src_process_manager.open_process(self.src_exe_path)
+        owner = self._mas_owner()
         write_src_config_snapshot_state(
             self.temp_ready_path,
             script_id=self.script_info.script_id,
             src_root_path=self.src_root_path,
             installation_id=self.src_installation_id,
-            # 查看会话不登记归属：中断恢复路径（_save_pending_config_session）
-            # 只在归属可验证时回写，查看会话的注入现场绝不能保存回用户目录
-            config_user_id=None if self.view_only else self._mas_owner(),
+            config_user_id=None if self.view_only else owner,
+            native_edit=not self.view_only and owner is None,
         )
+        self.process_cleanup_success = False
+        await self.src_process_manager.open_process(self.src_exe_path)
         write_src_process_state(
             self.src_process_state_path,
             script_id=self.script_info.script_id,
             src_root_path=self.src_root_path,
             webui_port=self.src_webui_port,
             installation_id=self.src_installation_id,
-            config_user_id=None if self.view_only else self._mas_owner(),
+            config_user_id=None if self.view_only else owner,
         )
         self.config_session_started = True
         await self.wait_event.wait()
